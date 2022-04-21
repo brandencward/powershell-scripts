@@ -1,4 +1,4 @@
-# powershell-scripts
+# random-scripts
 
 This is a random collection of powershell scripts I felt like sharing. All of the projects I post are just things I
 played around with to learn and are by no means perfect :stuck_out_tongue_closed_eyes:. I made these just for fun and to improve my skills. Hopefully
