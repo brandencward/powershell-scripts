@@ -22,10 +22,10 @@ param(
     [string] $DestinationPath,
 
     [Parameter(Mandatory = $true)]
-    [string] $FileAge,
+    [int] $FileAge,
 
     [Parameter(Mandatory = $true)]
-    [string] $DeleteAge,
+    [int] $DeleteAge,
 
     [Parameter(Mandatory = $true)]
     [int] $ScriptRunTime,
@@ -34,12 +34,12 @@ param(
     [int] $NumberToMove
 )
 
-function move-files ([string] $source, [string] $destination, [int] $age, [int] $maxCount, [double] $runTime) {
+function move-files ([string] $source, [string] $destination, [datetime] $moveAgeDate, [int] $maxCount, [double] $runTime) {
     try {
         $count = 0
 
         Get-ChildItem $source -Recurse -File |
-        Where-Object { $_.CreationTime -ge $age } |
+        Where-Object { ($_.CreationTime -le $moveAgeDate) -or ($_.LastWriteTime -le $moveAgeDate) } |
         ForEach-Object {
             if ($count -ge $maxCount) {
                 Write-Host "Maximum Number of files to move has been reached. Number of files moved: $count"
@@ -48,10 +48,11 @@ function move-files ([string] $source, [string] $destination, [int] $age, [int] 
             if (get-timeCheck -runTime $runTime -function "remove-files") {
                 break
             }
+            
             $newPath = $_.FullName -replace [regex]::Escape($source), $destination
             $newDirectory = (Get-Item $_.FullName).DirectoryName -replace [regex]::Escape($source), $destination
 
-            if (!(Test-Path $newDirectory)) {
+            if (!(Test-Path $newDirectory)) {                
                 New-Item -Path $newDirectory -ItemType Directory -Force | Out-Null
             }
             Move-Item -Path $_.FullName -Destination $newPath -Force
@@ -64,10 +65,10 @@ function move-files ([string] $source, [string] $destination, [int] $age, [int] 
     }
 }
 
-function remove-files ([string] $destination, [int] $age, [double] $runTime) {
+function remove-files ([string] $destination, [datetime] $deleteAgeDate, [double] $runTime) {
     try {
         Get-ChildItem $destination -Recurse -File |
-        Where-Object { $_.CreationTime -ge $age } |
+        Where-Object { ($_.CreationTime -le $deleteAgeDate) -or ($_.LastWriteTime -le $deleteAgeDate) } |
         ForEach-Object {
             if (get-timeCheck -runTime $runTime -function "remove-files") {
                 break
@@ -124,20 +125,20 @@ try {
 
     $source = $SourcePath
     $destination = $DestinationPath
-    $age = $FileAge
-    $deleteAge = $DeleteAge
+    $moveAgeDate = (Get-Date).AddDays(-$FileAge)
+    $deleteAgeDate = (Get-Date).AddDays(-$DeleteAge)
     $runTime = $ScriptRunTime
     $maxCount = $NumberToMove
 
     $timer = [Diagnostics.Stopwatch]::StartNew()
 
-    move-files -source $source -destination $destination -age $age -maxCount $maxCount -runTime $runTime
+    move-files -source $source -destination $destination -moveAgeDate $moveAgeDate -maxCount $maxCount -runTime $runTime
 
     if (get-timeCheck -runTime $runTime -function "main") {
         break
     }
 
-    remove-files -destination $destination -age $deleteAge -runTime $runTime
+    remove-files -destination $destination -deleteAgeDate $deleteAgeDate -runTime $runTime
 
     if (get-timeCheck -runTime $runTime -function "remove-emptyFolders") {
         break
@@ -146,6 +147,8 @@ try {
     remove-emptyFolders -destination $destination -runTime $runTime
 
     $timer.Stop()
+
+    Write-Host "Finished Script."
 }
 catch {
     $ErrorMessage = $_.Exception.Message + $_.Exception.StackTrace
