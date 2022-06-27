@@ -43,7 +43,7 @@ function move-files ([string] $source, [string] $destination, [datetime] $moveAg
         ForEach-Object {
             if ($count -ge $maxCount) {
                 Write-Host "Maximum Number of files to move has been reached. Number of files moved: $count"
-                return
+                break
             }
             if (get-timeCheck -runTime $runTime -function "remove-files") {
                 break
@@ -53,10 +53,14 @@ function move-files ([string] $source, [string] $destination, [datetime] $moveAg
             $newDirectory = (Get-Item $_.FullName).DirectoryName -replace [regex]::Escape($source), $destination
 
             if (!(Test-Path $newDirectory)) {                
-                New-Item -Path $newDirectory -ItemType Directory -Force | Out-Null
+                New-Item -Path $newDirectory -ItemType Directory -Force -ErrorAction Stop | Out-Null
             }
-            Move-Item -Path $_.FullName -Destination $newPath -Force
+            Move-Item -Path $_.FullName -Destination $newPath -Force -ErrorAction Stop
             $moveCount++
+
+            if ($moveCount % 100 -eq 0) {
+                Write-Host "$moveCount files moved."
+            }
         }
     }
     catch {
@@ -73,7 +77,7 @@ function remove-files ([string] $destination, [datetime] $deleteAgeDate, [double
             if (get-timeCheck -runTime $runTime -function "remove-files") {
                 break
             }
-            Remove-Item $_.FullName
+            Remove-Item $_.FullName -ErrorAction Stop
         }
     }
     catch {
@@ -94,13 +98,13 @@ function remove-emptyFolders ([string] $destination, [double] $runTime) {
                 if (get-timeCheck -runTime $runTime -function "remove-emptyFolders") {
                     break
                 }
-                Remove-Item $_
+                Remove-Item $_ -ErrorAction Stop
             }
         } while ($emptyFolders.count -gt 0)
     }
     catch {
         $ErrorMessage = $_.Exception.Message + $_.Exception.StackTrace
-        Write-Host = "Error checking time: $ErrorMessage"
+        Write-Host = "Error removing empty folders: $ErrorMessage"
     }
 }  
 
